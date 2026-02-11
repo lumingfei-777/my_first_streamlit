@@ -95,7 +95,7 @@ st.markdown("---")
 
 # 恋爱时间
 st.header("⏳ 我们已经在一起多久了")
-start_date = st.date_input("选择我们在一起的那一天", date(2024,1,1))
+start_date = st.write("那一天,我们在一起了", date(2024,1,1))
 
 today = date.today()
 days = (today - start_date).days
@@ -141,16 +141,6 @@ if st.button("换一句看看 💞"):
 
 st.markdown("---")
 
-# 照片墙
-st.header("📸 我们的回忆")
-st.info("把照片命名为 photo1.jpg / photo2.jpg / photo3.jpg 放同目录")
-
-col1, col2, col3 = st.columns(3)
-col1.image("photo1.jpg", use_container_width=True)
-col2.image("photo2.jpg", use_container_width=True)
-col3.image("photo3.jpg", use_container_width=True)
-
-st.markdown("---")
 
 st.markdown("<h3 style='text-align:center;color:white;'>❤️ 抬头是星空，低头是你 ❤️</h3>", unsafe_allow_html=True)
 

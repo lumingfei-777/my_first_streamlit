@@ -95,7 +95,7 @@ st.markdown("---")
 
 # 恋爱时间
 st.header("⏳ 我们已经在一起多久了")
-st.write("：2023.05.24 ❤️        那一天，我们在一起了")
+st.write("2023.05.24 ❤️        那一天，我们在一起了")
 start_date=date(2023,5,24)
 
 today = date.today()
@@ -113,7 +113,7 @@ st.header("🎮 爱心收集小游戏")
 st.write("每点一次，就多喜欢你一点 💕")
 
 if st.button("❤️ 点我"):
-    st.session_state.score += 1
+    st.session_state.score += 10
 
 st.metric("当前爱意值", st.session_state.score)
 
@@ -141,7 +141,15 @@ if st.button("换一句看看 💞"):
     st.rerun()
 
 st.markdown("---")
+st.header("📸 小公主照片")
+st.info("把照片命名为 photo1.jpg / photo2.jpg / photo3.jpg 放同目录")
 
+
+col1, col2, col3 = st.columns(3)
+col1.image("photo1.jpg", use_container_width=True)
+col2.image("photo2.jpg", use_container_width=True)
+col3.image("photo3.jpg", use_container_width=True)
+st.markdown("---")
 
 st.markdown("<h3 style='text-align:center;color:white;'>❤️ 抬头是星空，低头是你 ❤️</h3>", unsafe_allow_html=True)
 

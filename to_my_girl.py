@@ -123,15 +123,15 @@ if st.button("换一句看看 💞"):
 st.markdown("---")
 
 # ---------------- 照片墙 ----------------
-st.header("📸 我们的回忆")
-st.info("把照片命名为 photo1.jpg / photo2.jpg / photo3.jpg 放同目录")
+#st.header("📸 我们的回忆")
+#st.info("把照片命名为 photo1.jpg / photo2.jpg / photo3.jpg 放同目录")
 
-col1, col2, col3 = st.columns(3)
-col1.image("photo1.jpg", caption="我们的某一天", use_container_width=True)
-col2.image("photo2.jpg", caption="一起去过的地方", use_container_width=True)
-col3.image("photo3.jpg", caption="我最喜欢的瞬间", use_container_width=True)
+#col1, col2, col3 = st.columns(3)
+#col1.image("photo1.jpg", caption="我们的某一天", use_container_width=True)
+#col2.image("photo2.jpg", caption="一起去过的地方", use_container_width=True)
+#col3.image("photo3.jpg", caption="我最喜欢的瞬间", use_container_width=True)
 
-st.markdown("---")
+#st.markdown("---")
 
 # ---------------- 纪念日倒计时 ----------------
 st.header("🎂 下一个纪念日")

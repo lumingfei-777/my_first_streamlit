@@ -142,9 +142,9 @@ if st.button("换一句看看 💞"):
 st.header("📸 小公主照片")
 
 image_urls = [
-    "https://github.com/lumingfei-777/my_first_streamlit/blob/main/photos/img1.jpg",
-    "https://github.com/lumingfei-777/my_first_streamlit/blob/main/photos/img2.jpg",
-    "https://github.com/lumingfei-777/my_first_streamlit/blob/main/photos/img3.jpg",
+    "https://raw.githubusercontent.com/lumingfei-777/my_first_streamlit/main/photos/img1.jpg",
+    "https://raw.githubusercontent.com/lumingfei-777/my_first_streamlit/main/photos/img2.jpg",
+    "https://raw.githubusercontent.com/lumingfei-777/my_first_streamlit/main/photos/img3.jpg",
 ]
 
 cols = st.columns(3)

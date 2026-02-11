@@ -1,70 +1,101 @@
 # app.py
-# 💖 升级版：星空动画 + 爱心小游戏 + 情话点击切换
-# 运行：
+# 💖 升级版（修复星空显示问题）
 # pip install streamlit
 # streamlit run app.py
 
 import streamlit as st
 from datetime import datetime, date
-import random
-import time
 
 st.set_page_config(page_title="写给最爱的你 ❤️", page_icon="💖", layout="wide")
 
-# ---------------- 星空动画背景 ----------------
+# ---------------- 修复后的真正全屏星空背景 ----------------
 st.markdown("""
 <style>
-.main {
-    background: radial-gradient(ellipse at bottom, #0d1b2a 0%, #000000 100%);
-    overflow: hidden;
-}
-
-/* 星星 */
-.stars {
-    position: fixed;
-    top: 0; left: 0; right: 0; bottom: 0;
-    width: 100%; height: 100%;
+/* 让 Streamlit 默认白背景透明 */
+[data-testid="stAppViewContainer"] {
     background: transparent;
-    box-shadow:
-        100px 200px #FFF, 200px 50px #FFF, 300px 300px #FFF,
-        400px 150px #FFF, 500px 250px #FFF, 600px 100px #FFF,
-        700px 200px #FFF, 800px 50px #FFF, 900px 300px #FFF,
-        1000px 150px #FFF, 1100px 250px #FFF, 1200px 100px #FFF;
-    animation: animStar 60s linear infinite;
 }
 
-@keyframes animStar {
-    from {transform: translateY(0px);} 
-    to {transform: translateY(-2000px);} 
+.main {
+    background: transparent;
 }
 
-h1, h2, h3 {text-align:center; color:white;}
+/* 星空层（关键：放在最底层 fixed + z-index） */
+body::before {
+    content: "";
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+    background: #000;
+    z-index: -2;
+}
+
+body::after {
+    content: "";
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 200%;
+    height: 200%;
+    background-image:
+        radial-gradient(2px 2px at 20px 30px, white, transparent),
+        radial-gradient(2px 2px at 40px 70px, white, transparent),
+        radial-gradient(1px 1px at 90px 40px, white, transparent),
+        radial-gradient(2px 2px at 160px 120px, white, transparent),
+        radial-gradient(1px 1px at 200px 200px, white, transparent),
+        radial-gradient(2px 2px at 300px 150px, white, transparent),
+        radial-gradient(1px 1px at 350px 80px, white, transparent);
+    background-repeat: repeat;
+    background-size: 400px 400px;
+    animation: starsMove 60s linear infinite;
+    z-index: -1;
+    opacity: 0.8;
+}
+
+@keyframes starsMove {
+    from {transform: translateY(0);} 
+    to {transform: translateY(-400px);} 
+}
+
+h1, h2, h3 {
+    text-align: center;
+    color: white;
+}
+
+/* 卡片半透明，制造悬浮感 */
+section[data-testid="stSidebar"],
+div[data-testid="stMetric"],
+div.stButton {
+    backdrop-filter: blur(6px);
+}
 
 .stButton>button {
     background: linear-gradient(45deg,#ff4b6e,#ff758c);
-    color:white; border-radius:25px; height:3em; font-size:18px;
+    color: white;
+    border-radius: 25px;
+    height: 3em;
+    font-size: 18px;
 }
-
-.block-container {z-index:1;}
 </style>
-<div class="stars"></div>
 """, unsafe_allow_html=True)
 
-# ---------------- 初始化 session ----------------
+# ---------------- session 状态 ----------------
 if "score" not in st.session_state:
     st.session_state.score = 0
 
 if "quote_index" not in st.session_state:
     st.session_state.quote_index = 0
 
-# ---------------- 标题 ----------------
+# ---------------- 页面内容 ----------------
 st.title("🌌 写给世界上最可爱的你")
-st.subheader("在宇宙的某个角落，我们刚好相遇")
+st.subheader("在同一片星空下，我们刚好相爱")
 st.markdown("---")
 
-# ---------------- 恋爱时间 ----------------
+# 恋爱时间
 st.header("⏳ 我们已经在一起多久了")
-start_date = st.date_input("选择我们在一起的那一天", date(2023,5,24))
+start_date = st.date_input("选择我们在一起的那一天", date(2024,1,1))
 
 today = date.today()
 days = (today - start_date).days
@@ -76,42 +107,30 @@ c3.metric("分钟", f"{days*24*60:,}")
 
 st.markdown("---")
 
-# ---------------- 爱心点击小游戏 ----------------
+# 爱心小游戏
 st.header("🎮 爱心收集小游戏")
-st.write("规则：每点一次爱心，就代表我多喜欢你一点 💕")
+st.write("每点一次，就多喜欢你一点 💕")
 
-col1, col2 = st.columns([1,2])
+if st.button("❤️ 点我"):
+    st.session_state.score += 1
 
-with col1:
-    if st.button("❤️ 点我"):
-        st.session_state.score += 1
+st.metric("当前爱意值", st.session_state.score)
 
-with col2:
-    st.metric("当前爱意值", st.session_state.score)
-
-# 达到不同分数触发彩蛋
-if st.session_state.score == 10:
-    st.success("喜欢你已经无法隐藏了！")
-if st.session_state.score == 50:
+if st.session_state.score == 20:
     st.balloons()
-    st.success("已经超级超级喜欢你了！")
-if st.session_state.score == 100:
-    st.snow()
-    st.success("满分喜欢，只有你一个人。")
+    st.success("喜欢你这件事，正在指数级增长！")
 
 st.markdown("---")
 
-# ---------------- 今日情话（可点击切换） ----------------
+# 情话切换
 st.header("💬 今日情话")
 
 quotes = [
-"遇见你，是我写过最美的程序。",
-"如果生活是代码，你就是唯一的主函数。",
-"世界有很多变量，而你是我的常量。",
-"喜欢你不是三分钟热度，是无限循环。",
-"想和你从函数开始，一直运行到白头。",
-"你一笑，我的世界就完成了一次正确编译。",
-"别人是心动，我是持续心动。",
+"你是我宇宙里的唯一确定性。",
+"所有星星都在证明，我正在爱你。",
+"如果世界是代码，你就是最终运行结果。",
+"我不看月亮，只看你。",
+"浪漫不是突然，是我蓄谋已久的喜欢。"
 ]
 
 st.success(quotes[st.session_state.quote_index])
@@ -122,29 +141,17 @@ if st.button("换一句看看 💞"):
 
 st.markdown("---")
 
-# ---------------- 照片墙 ----------------
-#st.header("📸 我们的回忆")
-#st.info("把照片命名为 photo1.jpg / photo2.jpg / photo3.jpg 放同目录")
+# 照片墙
+st.header("📸 我们的回忆")
+st.info("把照片命名为 photo1.jpg / photo2.jpg / photo3.jpg 放同目录")
 
-#col1, col2, col3 = st.columns(3)
-#col1.image("photo1.jpg", caption="我们的某一天", use_container_width=True)
-#col2.image("photo2.jpg", caption="一起去过的地方", use_container_width=True)
-#col3.image("photo3.jpg", caption="我最喜欢的瞬间", use_container_width=True)
-
-#st.markdown("---")
-
-# ---------------- 纪念日倒计时 ----------------
-st.header("🎂 下一个纪念日")
-future = st.date_input("选择一个重要的日子", date(2026,1,1))
-remain = (future - today).days
-
-if remain >= 0:
-    st.metric("还有", f"{remain} 天")
-else:
-    st.warning("这个日子已经过去啦，我们再创造新的回忆吧～")
+col1, col2, col3 = st.columns(3)
+col1.image("photo1.jpg", use_container_width=True)
+col2.image("photo2.jpg", use_container_width=True)
+col3.image("photo3.jpg", use_container_width=True)
 
 st.markdown("---")
 
-st.markdown("<h3 style='text-align:center;color:white;'>❤️ 这个宇宙很大，但我只想和你一起探索 ❤️</h3>", unsafe_allow_html=True)
+st.markdown("<h3 style='text-align:center;color:white;'>❤️ 抬头是星空，低头是你 ❤️</h3>", unsafe_allow_html=True)
 
 

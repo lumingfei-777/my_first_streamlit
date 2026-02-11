@@ -64,7 +64,7 @@ st.markdown("---")
 
 # ---------------- 恋爱时间 ----------------
 st.header("⏳ 我们已经在一起多久了")
-start_date = st.date_input("选择我们在一起的那一天", date(2024,1,1))
+start_date = st.date_input("选择我们在一起的那一天", date(2023,5,24))
 
 today = date.today()
 days = (today - start_date).days

@@ -61,17 +61,16 @@ if st.button("发送 ❤️"):
 st.markdown("---")
 
 # ---------------- 照片墙 ----------------
-'''
-st.header("📸 我们的回忆")
-st.info("把你们的照片命名为 photo1.jpg / photo2.jpg 放在同目录即可显示")
 
-col1, col2, col3 = st.columns(3)
-col1.image("photo1.jpg", caption="第一次约会", use_container_width=True)
-col2.image("photo2.jpg", caption="一起去的地方", use_container_width=True)
-col3.image("photo3.jpg", caption="我最喜欢的一张", use_container_width=True)
+#st.header("📸 我们的回忆")
+#st.info("把你们的照片命名为 photo1.jpg / photo2.jpg 放在同目录即可显示")
 
-st.markdown("---")
-'''
+#col1, col2, col3 = st.columns(3)
+#col1.image("photo1.jpg", caption="第一次约会", use_container_width=True)
+#col2.image("photo2.jpg", caption="一起去的地方", use_container_width=True)
+#col3.image("photo3.jpg", caption="我最喜欢的一张", use_container_width=True)
+
+#st.markdown("---")
 # ---------------- 每日情话 ----------------
 st.header("💬 今日情话")
 quotes = [

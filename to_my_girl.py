@@ -85,15 +85,5 @@ st.success(quotes[datetime.now().day % len(quotes)])
 
 st.markdown("---")
 
-# ---------------- 倒计时 ----------------
-st.header("🎂 下一个纪念日倒计时")
-future = st.date_input("选择一个重要的日子", date(2026,1,1))
-remain = (future - today).days
 
-if remain >= 0:
-    st.metric("还有", f"{remain} 天")
-else:
-    st.warning("这个日子已经过去啦，我们换一个～")
-
-st.markdown("---")
 

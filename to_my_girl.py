@@ -95,7 +95,8 @@ st.markdown("---")
 
 # 恋爱时间
 st.header("⏳ 我们已经在一起多久了")
-start_date = st.write("那一天,我们在一起了", date(2024,1,1))
+st.write("那一天,我们在一起了    2023.5.24")
+staet_date=date(2023,5,24)
 
 today = date.today()
 days = (today - start_date).days

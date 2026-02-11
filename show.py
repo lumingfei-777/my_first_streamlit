@@ -3,7 +3,7 @@ import streamlit as st
 st.title("Hello👋")
 st.markdown(
     """ 
-    wyx是超级无敌大傻蛋
+    点开的是超级无敌大傻蛋
     """
 )
 

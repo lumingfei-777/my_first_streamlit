@@ -79,40 +79,17 @@ Smart-Eye adapts automatically during idle periods (no detections for >5s).
 ## Installation
 
 ```bash
-# 1. Clone repo
-git clone https://github.com/smarteye-project/smart-eye.git
-cd smart-eye
-
-# 2. Clone Metric3D
-git clone https://github.com/YvanYin/Metric3D.git ./Metric3D
-
-# 3. Install dependencies
-pip install ultralytics mmengine opencv-python numpy --break-system-packages
+Updates coming soon
 ```
 
-**Metric3D ViT-Small weights** are downloaded automatically on first run.  
-For offline environments, download manually and set `ckpt_file` to the local path.
+
 
 ---
 
 ## Quick Start
 
 ```python
-from finetune_daemon import FinetuneDaemon, FinetuneDaemonConfig
-
-# 1. Init daemon after detector
-daemon_cfg = FinetuneDaemonConfig(
-    base_model_path='./models/yolo26s.pt',
-    device='cuda',
-)
-finetune_daemon = FinetuneDaemon(daemon_cfg, detector.yolo_model)
-finetune_daemon.start()
-
-# 2. In main loop, after detect_and_track()
-finetune_daemon.on_detection_result(frame, drone_data, frame_count)
-
-# 3. On exit
-finetune_daemon.stop()
+Updates coming soon
 ```
 
 ---

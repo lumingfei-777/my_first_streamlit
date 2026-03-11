@@ -56,10 +56,11 @@ class FPSCounter:
 # ============== 全局配置 ==============
 METRIC3D_DIR = Path('./Metric3D')
 
+# 修改1: MODEL_TYPE 改为 ViT-Small
 MODEL_TYPE = {
-    'ViT-Large': {
-        'cfg_file': f'{METRIC3D_DIR}/mono/configs/HourglassDecoder/vit.raft5.large.py',
-        'ckpt_file': 'https://huggingface.co/JUGGHM/Metric3D/resolve/main/metric_depth_vit_large_800k.pth',
+    'ViT-Small': {
+        'cfg_file': f'{METRIC3D_DIR}/mono/configs/HourglassDecoder/vit.raft5.small.py',
+        'ckpt_file': 'https://huggingface.co/JUGGHM/Metric3D/resolve/main/metric_depth_vit_small_800k.pth',
     },
 }
 
@@ -256,7 +257,8 @@ class KalmanFilter3D:
 class Metric3DDepthEstimator:
     """Metric3D深度估计器"""
     
-    def __init__(self, model_type: str = 'ViT-Large', device: str = 'cuda'):
+    # 修改2: 默认参数改为 ViT-Small
+    def __init__(self, model_type: str = 'ViT-Small', device: str = 'cuda'):
         self.model_type = model_type
         self.device = device
         self.model = None
@@ -336,6 +338,51 @@ class Metric3DDepthEstimator:
         except Exception as e:
             self.logger.error(f"深度估计失败: {e}", exc_info=True)
             return np.zeros((img.shape[0], img.shape[1]), dtype=np.float32)
+    
+    # 修改3: 新增 estimate_depth_roi，自适应padding + 小目标过滤 + 中心区域median
+    def estimate_depth_roi(self, img: np.ndarray, bbox: List[int],
+                           intrinsic: List[float],
+                           min_depth_size: int = 30) -> float:
+        """
+        只对bbox区域估计深度，返回中心区域深度中位数
+        - padding自适应：取bbox宽高最大值的一半，保证ROI包含足够背景
+        - 目标太小时（宽或高 < min_depth_size）直接返回0，由卡尔曼预测代替
+        - 取中心小块median而非单点，抗异常值更稳定
+        """
+        x1, y1, x2, y2 = bbox
+        bw, bh = x2 - x1, y2 - y1
+
+        # 目标太小，深度估计不可靠，返回0让卡尔曼用预测值
+        if bw < min_depth_size or bh < min_depth_size:
+            return 0.0
+
+        # 自适应padding：取宽高最大值的一半
+        pad = max(bw, bh) // 2
+
+        x1p = max(0, x1 - pad)
+        y1p = max(0, y1 - pad)
+        x2p = min(img.shape[1], x2 + pad)
+        y2p = min(img.shape[0], y2 + pad)
+
+        roi = img[y1p:y2p, x1p:x2p]
+        if roi.size == 0:
+            return 0.0
+
+        # 主点平移适配ROI坐标系
+        fx, fy, cx, cy = intrinsic
+        roi_intrinsic = [fx, fy, cx - x1p, cy - y1p]
+
+        depth_map = self.estimate_depth(roi, roi_intrinsic)
+
+        # 取中心区域median，比单点更抗噪
+        h, w = depth_map.shape
+        ch, cw = h // 2, w // 2
+        margin = max(2, min(h, w) // 6)
+        center_patch = depth_map[
+            ch - margin : ch + margin,
+            cw - margin : cw + margin
+        ]
+        return float(np.median(center_patch))
 
 # ============== 无人机追踪器 ==============
 class DroneTrack:
@@ -355,7 +402,7 @@ class DroneTrack:
         self.predicted_history = deque(maxlen=MAX_TRACK_HISTORY)  # 预测值
         
         # 状态
-        self.last_detection_time = timestamp#最后一次记录的时间戳
+        self.last_detection_time = timestamp  # 最后一次记录的时间戳
         self.last_update_time = timestamp
         self.hits = 1  # 匹配次数
         self.misses = 0  # 未匹配次数
@@ -434,9 +481,9 @@ class DroneDetectorTracker:
         self,
         yolo_model_path: str,
         intrinsic: List[float],
-        tracker_type: str = 'bytetrack',
+        tracker_type: str = 'bytetrack.yaml',
         enable_depth: bool = True,
-        depth_model_type: str = 'ViT-Large',
+        depth_model_type: str = 'ViT-Small',
         fps: float = 30.0
     ):
         self.logger = logging.getLogger(f"{__name__}.DroneDetector")
@@ -465,7 +512,8 @@ class DroneDetectorTracker:
                 self.logger.warning(f"深度估计器初始化失败: {e}")
                 self.enable_depth = False
 
-        self._cached_depth_map = None
+        # 修改4: 每个目标独立的深度缓存（替换原来的整图缓存）
+        self._cached_depth_bbox: Dict[int, float] = {}
         
         # 追踪器字典 {track_id: DroneTrack}
         self.tracks: Dict[int, DroneTrack] = {}
@@ -476,7 +524,7 @@ class DroneDetectorTracker:
         self.total_detections = 0
     
     def get_depth_at_point(self, depth_map: np.ndarray, x: int, y: int) -> float:
-        """获取指定点深度"""
+        """获取指定点深度（保留备用，新方案不调用）"""
         h, w = depth_map.shape
         if 0 <= y < h and 0 <= x < w:
             return float(depth_map[y, x])
@@ -524,7 +572,6 @@ class DroneDetectorTracker:
         
         # 绘制滤波后的轨迹 (蓝色)
         if len(track.filtered_history) > 1:
-            # 3D轨迹投影到2D
             filtered_2d = []
             for pos_3d in track.filtered_history:
                 if pos_3d[2] > 0:
@@ -537,7 +584,7 @@ class DroneDetectorTracker:
                 pts = np.array(filtered_2d, dtype=np.int32)
                 cv2.polylines(frame, [pts], False, (255, 0, 0), 2)
         
-        # 绘制预测轨迹 (黄色虚线)
+        # 绘制预测轨迹 (黄色)
         future_traj = track.predict_trajectory(PREDICTION_HORIZON)
         if len(future_traj) > 0:
             predicted_2d = []
@@ -572,26 +619,11 @@ class DroneDetectorTracker:
         drone_data_list = []
         
         try:
-            
-            # 先用 YOLO 检测（不开深度）
+            # YOLO检测
             results = self.yolo_model.track(
                 frame, persist=True, tracker=self.tracker_type,
                 verbose=False, conf=0.5, classes=[0], imgsz=640
             )
-
-            has_detections = (
-                results[0].boxes is not None and 
-                results[0].boxes.id is not None and
-                len(results[0].boxes.id) > 0
-            )
-
-            if self.enable_depth and has_detections and depth_map is None:
-                if self.frame_count % 2 == 1:  # 奇数帧重新估计
-                    self._cached_depth_map = self.depth_estimator.estimate_depth(
-                    frame, self.intrinsic
-                    )
-                depth_map = self._cached_depth_map  # 偶数帧复用缓存
-        
             
             # 预测所有现有轨迹
             for track in self.tracks.values():
@@ -609,10 +641,13 @@ class DroneDetectorTracker:
                     x1, y1, x2, y2 = map(int, box)
                     center_x = (x1 + x2) // 2
                     center_y = (y1 + y2) // 2
-                    
-                    # 获取深度
-                    if self.enable_depth and depth_map is not None:
-                        depth_value = self.get_depth_at_point(depth_map, center_x, y2)
+
+                    # 修改4: ROI深度，每帧都测，每个目标独立缓存
+                    if self.enable_depth:
+                        depth_value = self.depth_estimator.estimate_depth_roi(
+                            frame, [x1, y1, x2, y2], self.intrinsic
+                        )
+                        self._cached_depth_bbox[track_id] = depth_value
                     else:
                         depth_value = 0.0
                     
@@ -621,7 +656,6 @@ class DroneDetectorTracker:
                     
                     # 更新或创建轨迹
                     if track_id not in self.tracks:
-                        # 新轨迹
                         self.tracks[track_id] = DroneTrack(
                             track_id, measurement_3d, current_time, self.dt
                         )
@@ -631,7 +665,6 @@ class DroneDetectorTracker:
                             [center_x, center_y], conf, current_time
                         )
                     else:
-                        # 更新现有轨迹
                         self.tracks[track_id].update(
                             measurement_3d,
                             [x1, y1, x2, y2],
@@ -647,10 +680,11 @@ class DroneDetectorTracker:
                 if track_id not in detected_ids:
                     track.mark_missed()
                     
-                    # 删除长时间未检测到的轨迹
+                    # 删除长时间未检测到的轨迹，同时清理深度缓存
                     if track.should_delete():
                         self.logger.info(f"删除轨迹 ID={track_id} (长时间未检测)")
                         del self.tracks[track_id]
+                        self._cached_depth_bbox.pop(track_id, None)
                         continue
             
             # 收集所有轨迹数据
@@ -673,19 +707,15 @@ class DroneDetectorTracker:
                     'uncertainty': float(state['uncertainty'])
                 }
                 
-                # 添加2D信息
                 if track.last_bbox:
                     drone_info['bbox_2d'] = track.last_bbox
                 if track.last_center_2d:
                     drone_info['center_2d'] = track.last_center_2d
                 
-                # 预测轨迹
                 future_traj = track.predict_trajectory(PREDICTION_HORIZON)
                 drone_info['predicted_trajectory'] = future_traj.tolist()
                 
                 drone_data_list.append(drone_info)
-                
-                # 绘制
                 self.draw_track_info(annotated_frame, track)
             
             # 绘制统计信息
@@ -712,17 +742,15 @@ class SocketClient:
     
     def __init__(self, host: str = '127.0.0.1', port: int = 65432):
         self.host = host
-        self._cached_depth_map = None
         self.port = port
         self.socket = None
         self.connected = False
         self.logger = logging.getLogger(f"{__name__}.SocketClient")
         self.send_queue = deque(maxlen=100)
-        self.send_thread = None#后台发送线程
-        self.running = False#运行状态
+        self.send_thread = None  # 后台发送线程
+        self.running = False  # 运行状态
         self.last_frame_send_time = 0
         self.frame_send_interval = 1.0 / 10  # 最多传10fps
-
 
     def should_send_frame(self) -> bool:
         now = time.time()
@@ -736,7 +764,6 @@ class SocketClient:
         if not self.connected:
             return
     
-        # JPEG压缩
         encode_params = [cv2.IMWRITE_JPEG_QUALITY, quality]
         ret, buffer = cv2.imencode('.jpg', frame, encode_params)
         if not ret:
@@ -757,24 +784,22 @@ class SocketClient:
         }
         self.send_queue.append(packet)
     
-    def connect(self) -> bool:#返回布尔值表示连接是否成功
+    def connect(self) -> bool:
         """连接到服务器"""
         try:
-            self.socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)#参数表示使用IPv4和TCP协议
+            self.socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)  # IPv4 + TCP
             self.socket.connect((self.host, self.port))
             self.connected = True
             self.logger.info(f"已连接到服务器: {self.host}:{self.port}")
             
-            # 发送设备注册
             device_info = {
                 'message_type': 'device_info',
                 'device_name': '无人机检测器',
                 'device_type': 'drone_detector',
                 'ip_address': socket.gethostbyname(socket.gethostname()),
             }
-            self._send_json(device_info)#发送设备信息到服务器
+            self._send_json(device_info)
             
-            # 启动发送线程
             self.running = True
             self.send_thread = threading.Thread(target=self._send_loop, daemon=True)
             self.send_thread.start()
@@ -789,8 +814,8 @@ class SocketClient:
         """发送JSON数据"""
         try:
             if self.socket and self.connected:
-                json_str = json.dumps(data, ensure_ascii=False)#将数据转换为JSON字符串，允许非ASCII字符
-                self.socket.sendall((json_str + '\n').encode('utf-8'))#发送数据并添加换行符作为分隔
+                json_str = json.dumps(data, ensure_ascii=False)
+                self.socket.sendall((json_str + '\n').encode('utf-8'))
                 return True
         except Exception as e:
             self.logger.error(f"发送失败: {e}")
@@ -802,7 +827,7 @@ class SocketClient:
         while self.running:
             try:
                 if self.send_queue and self.connected:
-                    data = self.send_queue.popleft()#从队列中获取最早的信息
+                    data = self.send_queue.popleft()
                     self._send_json(data)
                 else:
                     time.sleep(0.01)
@@ -821,9 +846,7 @@ class SocketClient:
             'readings': {
                 'drone_count': len(drone_data_list),
                 'active_count': len([d for d in drone_data_list if not d.get('is_occluded', False)]),
-                #未被遮挡的无人机数量
                 'occluded_count': len([d for d in drone_data_list if d.get('is_occluded', False)]),
-                #遮挡的无人机数量
                 'drones': drone_data_list
             }
         }
@@ -834,7 +857,7 @@ class SocketClient:
         self.running = False
         self.connected = False
         if self.send_thread:
-            self.send_thread.join(timeout=2)#主线程等待发送线程结束，最多等待2秒
+            self.send_thread.join(timeout=2)
         if self.socket:
             try:
                 self.socket.close()
@@ -846,7 +869,6 @@ class SocketClient:
 # ============== 主程序 ==============
 def main():
     """主程序"""
-    # 配置
     CAMERA_INTRINSIC = [800.0, 800.0, 640.0, 360.0]
     YOLO_MODEL_PATH = './models/yolov8n.pt'
     SERVER_HOST = '127.0.0.1'
@@ -863,28 +885,27 @@ def main():
     
     from finetune_daemon import FinetuneDaemon, FinetuneDaemonConfig
 
-    daemon_cfg = FinetuneDaemonConfig(
-        base_model_path=YOLO_MODEL_PATH,
-        dataset_dir='./finetune_dataset',
-    )
-    finetune_daemon = FinetuneDaemon(daemon_cfg, detector.yolo_model)
-    finetune_daemon.start()
-
-    
     # 初始化检测器
     try:
         detector = DroneDetectorTracker(
             yolo_model_path=YOLO_MODEL_PATH,
             intrinsic=CAMERA_INTRINSIC,
-            tracker_type='bytetrack',#使用多目标追踪算法Bytetrack
+            tracker_type='bytetrack.yaml',
             enable_depth=ENABLE_DEPTH,
-            depth_model_type='ViT-Large',
+            depth_model_type='ViT-Small',
             fps=FPS
         )
         logger.info("✓ 检测器初始化成功")
     except Exception as e:
         logger.error(f"✗ 检测器初始化失败: {e}")
         return
+
+    daemon_cfg = FinetuneDaemonConfig(
+        base_model_path=YOLO_MODEL_PATH,
+        dataset_dir='./finetune_dataset',
+    )
+    finetune_daemon = FinetuneDaemon(daemon_cfg, detector.yolo_model)
+    finetune_daemon.start()
     
     # 连接服务器
     socket_client = None
@@ -923,7 +944,6 @@ def main():
             
             frame_count += 1
             
-            # 检测与追踪
             annotated_frame, drone_data = detector.detect_and_track(frame)
             
             finetune_daemon.on_detection_result(frame, drone_data, frame_count)
@@ -931,11 +951,9 @@ def main():
             if socket_client and socket_client.should_send_frame():
                 socket_client.send_frame(annotated_frame, frame_count, quality=50)
 
-            # 发送数据
             if socket_client and drone_data:
                 socket_client.send_drone_data(drone_data)
             
-            # 打印结果
             if drone_data:
                 active_drones = [d for d in drone_data if not d.get('is_occluded', False)]
                 occluded_drones = [d for d in drone_data if d.get('is_occluded', False)]
@@ -958,7 +976,6 @@ def main():
                     pos = drone['position_3d']
                     logger.info(f"  [遮挡] ID{track_id}: 预测位置({pos[0]:.1f},{pos[1]:.1f},{pos[2]:.1f})m")
             
-            # FPS
             loop_time = time.time() - loop_start
             current_fps = 1.0 / loop_time if loop_time > 0 else 0
             fps_counter.append(current_fps)
